@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import datetime
-
+import functools
 import pytz
 import io
 import math
@@ -347,6 +347,24 @@ def sanitize_filename_part(text, replace_spaces=True):
     return text
 
 
+@functools.cache
+def get_scheduler_str(sampler_name, scheduler_name):
+    """Returns the scheduler name if the scheduler is applicable to the sampler"""
+    if sampler := sd_samplers.all_samplers_map.get(sampler_name):
+        if default_scheduler := sampler.options.get('scheduler'):
+            return (default_scheduler if scheduler_name == 'Automatic' else scheduler_name).capitalize()
+    return ''
+
+
+@functools.cache
+def get_sampler_scheduler_str(sampler_name, scheduler_name):
+    """Returns the '{Sampler} {Scheduler}' if the scheduler is applicable to the sampler"""
+    if scheduler := get_scheduler_str(sampler_name, scheduler_name):
+        return f'{sampler_name} {scheduler}'
+    else:
+        return sampler_name
+
+
 class FilenameGenerator:
     replacements = {
         'seed': lambda self: self.seed if self.seed is not None else '',
@@ -358,6 +376,8 @@ class FilenameGenerator:
         'height': lambda self: self.image.height,
         'styles': lambda self: self.p and sanitize_filename_part(", ".join([style for style in self.p.styles if not style == "None"]) or "None", replace_spaces=False),
         'sampler': lambda self: self.p and sanitize_filename_part(self.p.sampler_name, replace_spaces=False),
+        'sampler_scheduler': lambda self: self.p and sanitize_filename_part(get_sampler_scheduler_str(self.p.sampler_name, self.p.scheduler), replace_spaces=False),
+        'scheduler': lambda self: self.p and sanitize_filename_part(get_scheduler_str(self.p.sampler_name, self.p.scheduler), replace_spaces=False),
         'model_hash': lambda self: getattr(self.p, "sd_model_hash", shared.sd_model.sd_model_hash),
         'model_name': lambda self: sanitize_filename_part(shared.sd_model.sd_checkpoint_info.name_for_extra, replace_spaces=False),
         'date': lambda self: datetime.datetime.now().strftime('%Y-%m-%d'),
